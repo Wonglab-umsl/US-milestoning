@@ -1,0 +1,17 @@
+#!/bin/bash
+
+name=$1
+scratch=$2
+origdir=`dirname $scratch`
+#scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/pathways/
+mkdir -p $scratch/data
+mkdir -p $scratch/dcd
+
+#nseg=8
+for x in `echo "coor vel"`
+do
+	#for iseg in `seq 1 $nseg`
+	#do
+		cp -v $origdir/heat-data/$name-equil.$x $scratch/data/$name-0.$x
+	#done
+done

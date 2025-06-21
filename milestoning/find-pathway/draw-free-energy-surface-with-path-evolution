@@ -1,0 +1,21 @@
+#!/bin/bash
+
+module purge
+module load vmd
+module load python/2.7.9
+module load ImageMagick
+
+export STRIDE_BIN=~/stride/stride
+name=$1
+fe=$2
+maxstep=$3
+shift 3
+#pathway=$3
+#feinc=$3
+#feend=$3
+#~/vmd/
+vmd -eofexit -e draw-free-energy-surfaces-with-path-evolution.tcl -dispdev text -size 2880 1440 -args $name $fe $maxstep "$@" 
+fname=`printf $name-explicit-wham-fe-contours-%.1f-pathway $fe`
+magick convert images/$fname.tga images/$fname.png
+fname2=`printf $name-explicit-wham-fe-contours-%.1f-pathway-side $fe`
+magick convert images/$fname2.tga images/$fname2.png

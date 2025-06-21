@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=do-gaussian
+#SBATCH --time=0-24:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=8
+#SBATCH --array 1-8
+
+module load gaussian
+module load vmd
+cpd=`echo "cpd2 cpd3 cpd5 cpd6 cpd8 cpd11 cpd12 cpd12n" | awk -v i=$SLURM_ARRAY_TASK_ID '{print $i}'`
+cd $cpd
+#g09 $cpd.inp
+formchk ${cpd}.chk
+echo "doing density"
+cubegen 8 Density=SCF ${cpd}.fchk ${cpd}-chgdens.cube
+for orb in `echo "homo lumo"`
+do
+	echo "doing $orb orbitals"
+	cubegen 8 MO=$orb ${cpd}.fchk ${cpd}-${orb}.cube
+	vmd -eofexit -dispdev text -e ../draw-orbitals.tcl  -args ${cpd}-${orb}.cube ../images/${cpd}-${orb}.tga
+	magick convert ../images/${cpd}-${orb}.tga ../images/${cpd}-${orb}.png
+done
+echo "doing potential"
+cubegen 8 Potential=SCF ${cpd}.fchk ${cpd}-pot.cube
+

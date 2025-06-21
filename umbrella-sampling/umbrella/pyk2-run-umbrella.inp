@@ -1,0 +1,116 @@
+#
+# NAMD script for minimization: H Kamnberaj and D Barr
+#
+#set name :name;
+#200 ps each at force constants 0.75, 0.5, 0.25, 0.1, 0
+set name $env(name)
+#set force $env(force)
+set window $env(window)
+set section $env(section)
+#set section 1
+set prev [expr $section - 1]
+set freq 500
+set scratch $env(scratch)
+#set comx $env(comx)
+#set comy $env(comy)
+#set comz $env(comz)
+#set refpdb "data/$name-tramd-window-$window-ref.pdb"
+
+#read the force field parameters
+amber               yes
+cwd                 .
+parmfile            ../heat-explicit3/prmtop/$name-tramd-window-$window-solvated.prmtop
+#waterModel          tip3
+
+# read initial coordinates
+coordinates          ../ref//$name-tramd-window-$window-ref.pdb
+extendedSystem       $scratch/data/$name-tramd-window-$window-$prev.xsc
+bincoordinates       $scratch/data/$name-tramd-window-$window-$prev.coor
+binvelocities        $scratch/data/$name-tramd-window-$window-$prev.vel
+
+# Output
+outputname          $scratch/data/$name-tramd-window-$window-$section
+binaryoutput        yes
+#restartname         $scratch/data/$name-tramd-window-$window-restart
+#if {$section == 1} {
+restartfreq         50000
+#} 
+binaryrestart       yes
+DCDfile             $scratch/dcd/$name-tramd-window-$window-$section.dcd
+DCDUnitCell         yes
+DCDfreq             $freq
+outputEnergies      5000
+outputTiming        5000
+#outputPressure      $freq
+XSTfile             $scratch/data/$name-tramd-window-$window-$section.xsc
+XSTfreq             50000
+
+# Simulation box sizes
+cellOrigin           0.0 0.0 0.0
+wrapNearest          on
+
+
+# Non-bonded interaction settings
+switching            on              # Flag to set switching on (if off truncatted cutoff is used)
+switchdist           10.0            # Switch distance <= cutoff
+cutoff               12.0            # Cutoff for non-bounded interaction
+pairlistdist         14.0            # Cutoff for neighbouring list
+
+
+# Ewald PME parameters
+PME                  on
+#PMEGridSpacing       1.0
+PMEGridSizeX         80
+PMEGridSizeY         80
+PMEGridSizeZ         80
+
+# 1-4 non-bounded interaction scaling
+# 1.0 for charmm force field and 0.833333 for Amber
+exclude              scaled1-4
+1-4scaling           0.833333
+dielectric           1.0
+mergeCrossterms      no                # Print the CMAP separately for comparison with CHARMM
+
+# Approximations
+rigidBonds           all               # Shake all bonds involving hydrogen
+#rigidTolerance       0.00000001        # TOL of convergence of SHAKE
+rigidTolerance       0.0000001
+rigidIterations      100               # Maximum SHAKE-H iterations
+rigidDieOnError      on                # Exit and report an error if MaxIt of SHAKE-H is achieved 
+useSettle            on                # Use SETTLE for SHAKE water instead it is faster 
+vdwGeometricSigma    no                # Geometric is required for example by OPLS
+COMmotion            no                # Don't allow initial center of mass zero
+zeroMomentum         yes               # remove COM drift due to PME
+
+# Numerical Integrator settings
+timestep             2.0               # timestep in fs
+# Constant Temperature Control
+langevin            on    # do langevin dynamics
+langevinDamping     10     # damping coefficient (gamma) of 5/ps
+langevinTemp        300
+langevinHydrogen    off    # don't couple langevin bath to hydrogens
+
+
+langevinPiston        on
+langevinPistonTarget  1.01325 #  in bar -> 1 atm
+langevinPistonPeriod  100.
+langevinPistonDecay   50.
+langevinPistonTemp    300
+
+# Format output
+wrapWater             on
+wrapAll               off
+
+#collective variable stuff
+colvars                on
+colvarsConfig          io/colvar-$name-tramd-$window.inp	
+#colvarsTrajFrequency   $freq
+#to get colvars.traj file, need to enable "restartfreq" above
+
+# Number of Steps
+set steps [expr int( 1000 / 0.002) ]
+set start [expr 500000 + $prev * $steps]
+#set start            0
+#puts $start
+firsttimestep        $start                 # first time step = 0 for a start job /= 0 for restart job
+run                  $steps

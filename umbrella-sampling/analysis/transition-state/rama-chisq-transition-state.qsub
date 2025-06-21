@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-contact-anal
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --output=temp/slurm-%A.out
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem=131072
+
+./rama-chisq-transition-state2.py 5 420 690 1

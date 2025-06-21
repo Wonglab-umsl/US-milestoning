@@ -1,0 +1,27 @@
+#source /home/jmsc87/miniconda3/pkgs/ambertools-20.15-py37hc295af0_1/dat/leap/cmd/leaprc.protein.ff14SB
+#source /home/jmsc87/miniconda3/pkgs/ambertools-20.15-py37hc295af0_1/dat/leap/cmd/leaprc.gaff
+source /home/jmsc87/.conda/envs/AmberTools21/dat/leap/cmd/leaprc.protein.ff14SB
+source /home/jmsc87/.conda/envs/AmberTools21/dat/leap/cmd/leaprc.water.tip3p
+source /home/jmsc87/.conda/envs/AmberTools21/dat/leap/cmd/leaprc.gaff
+loadamberparams /home/jmsc87/.conda/envs/AmberTools21/dat/leap/parm/frcmod.ionsjc_tip3p
+loadamberparams params/:cpd;.frcmod
+set default PBradii mbondi2
+#CPD = loadAmberPrep params/:cpd;.prepi
+CPD = loadMol2 params/:cpd;-resp2.mol2
+#need to replace HSD->HID, HSE->HIE, CD  ILE->CD1 ILE
+#also need to insert "TER" at end of protein before ligand
+#
+protein  = loadpdb pyk2-nodrug.pdb
+complex = combine { protein CPD }
+check complex
+
+saveamberparm complex prmtop/:name;.prmtop data/:name;.inpcrd
+savepdb complex pdb/:name;.pdb
+#solvateBox complex TIP3PBOX 14 1.0
+#charge complex
+#addionsrand complex Na+ :nna; Cl- :ncl;
+#charge complex
+#check complex
+#saveamberparm complex data/:name;-tramd-window-:iwindow;-solvated.prmtop data/:name;-tramd-window-:iwindow;-solvated.inpcrd
+#savepdb complex data/:name;-tramd-window-:iwindow;-solvated.pdb
+quit

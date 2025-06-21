@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-umbrella-heat
+#SBATCH --time=0-8:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+module load vmd
+name=pyk2-cpd10-amber
+nwindow=452
+#iwindow=$SLURM_ARRAY_TASK_ID
+for iwindow in `seq 1 $nwindow`
+do
+	./join-amber $name $iwindow
+
+	windows=$name-tramd-windows-rel-to-first
+	datafile=data-rel-to-first/$name-tramd-com-$iwindow
+	dcdfile=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/dcd-joined/$name-tramd-window-$iwindow-nowater.dcd
+	reffile=../run3/data/$name-tramd-window-1-ref.pdb
+	com=`awk -v i=$iwindow '($1==i) {print $2,$3,$4}' $windows`
+	vmd -eofexit -dispdev text -e get-relative-com3.tcl -args $name.prmtop $dcdfile $reffile $datafile $com
+done

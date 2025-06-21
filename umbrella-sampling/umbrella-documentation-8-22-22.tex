@@ -1,0 +1,98 @@
+% This is a sample LaTeX input file.  (Version of 11 April 1994.)
+%
+% A '%' character causes TeX to ignore all remaining text on the line,
+% and is used for comments like this one.
+
+\documentclass{article}      % Specifies the document class
+
+                             % The preamble begins here.
+\title{Conducting Window-based Umbrella Sampling Simulations with NAMD and Analysis with TRAM}  % Declares the document's title.
+\author{Justin Spiriti}      % Declares the author's name.
+%\date{January 21, 1994}      % Deleting this command produces today's date.
+
+\newcommand{\ip}[2]{(#1, #2)}
+                             % Defines \ip{arg1}{arg2} to mean
+                             % (arg1, arg2).
+
+%\newcommand{\ip}[2]{\langle #1 | #2\rangle}
+                             % This is an alternative definition of
+                             % \ip that is commented out.
+
+\begin{document}             % End of preamble and beginning of text.
+\setlength{\textwidth}{6.5in}
+\setlength{\textheight}{9in}
+\setlength{\hoffset}{-1in}
+\setlength{\voffset}{-1in}
+\maketitle                   % Produces the title.
+
+
+
+\section{Umbrella Sampling Simulations}
+
+\begin{enumerate}
+\item briefly describe the concept of umbrella sampling, including the form of the umbrella potential and reaction coordinate, at a level suitable for undergrads
+
+\item overview explicit solvent protocol (initial pathway, solvation, minimizing, heating, equilibration, production run)
+\end{enumerate}
+
+Conventional molecular dynamics simulations involve simulating the motion of atoms using Newton's laws in a potential given by the force field
+\begin{eqnarray}
+U_\mathrm{FF}(\mathbf{x}) &=& \sum_\mathrm{all\ bonds} \frac{1}{2} K_b\left(b-b_0\right)^2  + \sum_\mathrm{all\  angles} \frac{1}{2} K_\theta\left(\theta-\theta_0\right)^2 + \sum_\mathrm{all\ torsion\ angles} K_\phi\left[1-\cos\left(n\phi+\delta\right)\right] \nonumber \\
+& &  +  \sum_\mathrm{all\ nonbonded\ pairs} \varepsilon \left[\left(\frac{r_0}{r}\right)^{12} - 2 \left(\frac{r_0}{r}\right)^6 \right] +  \sum_\mathrm{all\ nonbonded\ pairs} \frac{K_\mathrm{coul} q_i q_j}{r}
+\end{eqnarray} 
+The concept behind umbrella sampling is to add an additional term that forces the simulation to sample in different regions of a space defined by a reaction coordinate.  The reaction coordinate is a function of the Cartesian coordinates that defines structural changes in the system.  In this case we use the coordinates of the center of mass of the ligand relative to the protein after first aligning the protein-ligand complex via backbone with a reference structure.   A harmonic term in terms of this center of mass is added to the force field potential.
+\begin{equation}
+U(\mathbf{x}) = U_\mathrm{FF}(\mathbf{x}) + \frac{k}{2}\left(\mathbf{r}_\mathrm{CM}-\mathbf{r}_\mathrm{CM,0}\right)^2
+\end{equation}
+The harmonic term is centered on a position taken from a previously performed simulation designed to obtain at least one pathway for dissociation; this can be from a steered molecular dynamics simulation, a $\tau$-RAMD simulation, a simulation from the ``pathways'' method described below, or some other technique.  
+
+
+This attempts to document how I performed the umbrella sampling simulations for PYK2 and the Markov state analysis using TRAM.  I have tried to collect together all the scripts I used in the \verb+scripts/+ directory.  Most of the scripts identify the simulation by a \verb+name+ parameter.  The name I use is a combination of the name of the protein, the ligand, and the force field used, for example \verb+pyk2-cpd1-amber+.   
+
+Needed software includes \verb+tleap+ from AmberTools, VMD and NAMD.  If compounds need to be parameterized, it will be necessary to use Schrodinger Maestro, Gaussian, and \verb+antechamber+ from AmberTools as well.
+
+\begin{enumerate}
+
+\item It may be necessary to construct a force field for the compound.  This requires performing a quantum chemistry optimization using Gaussian to obtain the electrostatic potential, to which the partial charges can then be fitted using the RESP method.  The scripts require a \verb+mol2+ file for the compound, which is best obtained by loading a reference PDB file into Schrodinger Maestro, deleting everything except the ligand, making any needed chemical modifications, and saving the result as a \verb+mol2+ file.  This ensures that atom names in the force field match those in the PDB file.  the \verb+set-up-gaussian3+ script uses \verb+antechamber+ to set up two Gaussian input files.  The first performs an optimization at the HF/MIDIX level (MIDIX is a small basis set optimized for reproducing geometries) and the second performs an optimization at the HF/6-31g* level using the output of the first as an initial guess.  The \verb+do-gaussian3.qsub+ submission script runs both calculations.  Finally, the \verb+finish-parameterization+ script completes the parameterization, using \verb+antechamber+ once again to fit the charges to the electrostatic potential.  (The \verb+do-cubes.qsub+ and \verb+draw-orbitals.tcl+ scripts may be used to draw a picture of the orbitals.) These scripts are in the \verb+scripts/params/+ directory.
+
+\item The ``pathway'' method is a simplified version of the weighted ensemble method designed to find initial pathways for ligand dissociation.  It is an alternative to SMD or $\tau$-RAMD for this purpose.  It works by running a number of simulations in parallel for a short length of time, then selecting those in which the ligand has moved the most and starting new simulations from them.  The \verb+run-pathways.qsub+ script is the master script that controls everything.   The number of simultaneous simulations is set through the \verb+nseg+ variable.  It should divide the total number of processors used (set by the \verb+ntasks+ option in the script header).  The number of new simulations started at each iteration (which should divide the total number of simulations) is set through the \verb+nstart+ variable.  The total number of iterations is given in the \verb+for iter in `seq 1 200`+ statement.   The \verb+segment-explicit.inp+ and \verb+segment-gb.inp+ scripts are NAMD scripts that actually run the MD simulations; \verb+select-new-simulations.py+ is a Python script that selects the new simulations and writes this information to a log file.  
+
+
+\item The first step is to choose the centers of the umbrella potentials from among the configurations sampled in a previous SMD or $\tau$-RAMD simulation.  For $\tau$-RAMD simulations  the \verb+get-com-all+  script reads each $\tau$-RAMD trajectory and constructs a file giving the ligand center of mass for each frame in each trajectory (calling VMD with the \verb+get-relative-com3.tcl+ script to accomplish its work.  The \verb+get-windows.py+ script actually selects the windows.  This script is important because it selects the spacing and extent of the windows.  The parameters are
+\begin{verbatim}
+./get-windows.py list-of-coms interval limit > list-of-windows
+\end{verbatim}
+where \verb+list-of-coms+ is the list of centers of mass generated by \verb+get-com-all+, \verb+interval+ is the minimum distance between centers, and \verb+limit+ is the maximum distance for a center from the initial center of mass (which the script takes to be the center of mass in the original list of centers of mass, which comes from first frame of the first trajectory file originally considered).   For the PYK2 simulations, the windows were 1.0 \AA\ apart, and the limit was 15 \AA. The output of \verb+get-windows.py+ is a list containing the window number, name of the trajectory and frame from which each center is selected, and coordinates of the center of mass .   The \verb+get-windows+ script (which relies on the \verb+align-frame.tcl+ script) uses this file to extract the frames, align each one to a reference structure, and write them as individual PDB files in a directory named \verb+frames+.   All of the above-mentioned scripts can be found in the \verb+scripts/extract/+ directory.
+
+\item Each of the extracted frames needs to be solvated, placing water molecules in a box around the protein and adding sodium chloride to make the system neutral and to give a salt concentration of 150 mM.  This is accomplished using the \verb+solvate-all+ script which takes the following parameters:
+\begin{verbatim}
+./solvate-all name cpd nwindow
+\end{verbatim}
+The \verb+cpd+ parameter is the specific name of the ligand (for example \verb+cpd1+); the script uses this to construct the names of the frcmod and lib parameter files that it will use (\verb+cpd.frcmod+ and \verb+cpd.lib+ respectively).  The script calls tleap from AMBER with the \verb+tleap-explicit-template.in+ script, processing PDB files in  the \verb+frames+ directory and placing solvated PDB files and corresponding inpcrd and prmtop files in the \verb+data+ directory.  The \verb+sed+ statement in the script modifies each PDB file so that it can be processed by tleap, by relabeling hydrogen atoms in the amino group at the N-terminus and placing a \verb+TER+ marker between the atoms of the protein and atoms of the ligand.  It must be modified to do these correctly for a new protein otherwise tleap will give errors.  The \verb+solvate-all+ script also calls the \verb+setup-ref.awk+ script, which marks all non-hydrogen atoms in the protein and ligand with a 1.0 in the B-factor column (this is important for the restraints during the heating and equilibration phase), creating a ``reference structure'' that is placed in the \verb+../ref+ directory.  All of these scripts can be found in the \verb+scripts/solvate/+ directory.
+
+\item The systems need to be minimized, heated, and equilibrated.  This is done with harmonic restraints on the heavy atoms of the protein and ligand, so that the water equilibrates to the protein-ligand complex and not the other way around.  The systems are minimized in five phases with harmonic restraints on the heavy atoms of the protein and ligand and with force constants that descend in factors of 10 from $10^4$ kcal/mol \AA${}^2$ to 1 kcal/mol \AA${}^2$; each phase consists of 1000 steps of minimization.  Heating then takes place over 600 ps with the harmonic restraints at 1 kcal/mol \AA${}^2$, and with the temperature increasing by 10 K every 20 ps.  Equilibration takes place over 400 ps in five phases with the harmonic restraints of 0.75, 0.5, 0.25, 0.1 and 0 kcal/mol \AA${}^2$. The NAMD scripts  that perform these tasks are \verb+pyk2-umbrella-minimize-amber.inp+, \verb+pyk2-umbrella-heat-amber.inp+, and \verb+pyk2-umbrella-equil-amber.inp+.   The \verb+pyk2-umbrella-heat.qsub+ script may be used to submit to the Foundry queue (or modified for another cluster).  These scripts can be found in the \verb+scripts/min-heat-equil/+ directory.
+
+\item Finally, the production run can begin.  It is necessary to run the \verb+fix-ref.awk+ script on each of the reference structures in order to re-mark each backbone atom in the PDB file with a 1.0 in the B-factor column.  The main NAMD script is \verb+pyk2-run-umbrella.inp+ and the definition of the umbrella potential is in \verb+colvar3.inp+.   The force constant $k$ for the umbrella potential is given by the \verb+forceConstant+ setting in the script.  The MD simulation is run in 1-ns sections coordinated by the \verb+do5+ script.   This script calls NAMD to run a section of dynamics, then strips the water molecules from the trajectory file for that section to save disk space.  The master control script is \verb+pyk2-run-umbrella-foundry.qsub+.  The overall length of the simulation can be adjusted via the loop in this script.   The These scripts are located in the \verb+scripts/umbrella/+ directory.
+ 
+\item The trajectory segments need to be joined together to form complete trajectories.  The \verb+join-amber+ script performs this.  The center of mass of the ligand in each frame also needs to be determined.  This is done using the \verb+get-relative-com3.tcl+ (which is slightly different from the one in the \verb+scripts/extract/+ directory).  
+
+\item Finally the free energy surface can be derived using WHAM.   The source code for the WHAM program is \verb+wham3d-1d3.f90+ (it may be compiled with any Fortran compiler before use).   The \verb+create-control-file+ script generates a ``control file'' that is the primary input for the WHAM program.   The first line of this control file (which is output by \verb+create-control-file+) contains several parameters, including the total number of data points for each window, the resolution of the grid for the three-dimensional histograms, starting and ending times, and the maximum number of WHAM iterations and convergence tolerance.  The control file also contains the force constant for the umbrella potential, which must match what was specified in \verb+colvar3.inp+.  The program produces a DX file containing the three-dimensional free energy surface that may be visualized using VMD.  This is done by importing it into VMD as a volumetric data set alongside the reference structure used for alignment, then adding a representation with the drawing style set to Isosurface and the surface style set to Solid Surface.  The level of the contour may be set through the Isovalue box.  (The WHAM program also outputs the values of $\ln Z_i/Z_0$; however there might be a minor bug that causes these to come out with the wrong sign.  
+\end{enumerate}
+
+\section{TRAM scripts}
+
+These are in the \verb+scripts/tram/+ directory.
+\begin{enumerate} 
+\item \verb+tica-lag-time-validation-unbiased.py+ -- performs TICA analysis. \\
+\item \verb+do-cluster.py+ -- K-means clustering in TICA space \\
+\item \verb+get-ligand-com.py+ -- determine ligand center of mass in NumPy format for the benefit of the other scripts \\
+\item \verb+pyemma-tram-unbiased2.py+ -- construct the TRAM model \\
+\item \verb+plot-flux-colored2.py+ -- calculate  and plot dissociation rates as a function of distance cutoff between unbound and bound states \\
+\item \verb+plot-flux-colored-pcca4.py+ -- construct macrostates from the TRAM model using PCCA and select representative frames
+\end{enumerate}
+
+\section{Sample data}
+
+The \verb+scripts/sample-data/pyk2-cpd1-amber-tramd-solvated.zip+ file contains \verb+prmtop+ files and starting structures for the solvated systems corresponding to the PYK2-compound 1 system.  The structures need to have their occupancy and B-factor columns marked using either the \verb+setup-ref.awk+ or \verb+fix-ref.awk+ scripts.
+
+\end{document}               % End of document.

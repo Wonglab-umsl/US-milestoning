@@ -1,0 +1,239 @@
+#!/bin/bash
+
+name=$1
+milestone=$2
+id=$3
+start=$4
+end=$5
+nprocs=$6
+scratch=$7
+storage=$scratch
+#destpath=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning/
+destpath=/scratchE2/spiritij/pyk2/milestoning/
+
+if [ "$name" == "pyk2-cpd1-amber" ]; then
+	pathwayfile=$name-pathway-4
+	milestonefile=$name-milestones-3
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd2-amber" ]; then
+	pathwayfile=$name-pathway-15
+	milestonefile=$name-milestones-3
+	refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd8-amber" ]; then
+	pathwayfile=$name-pathway-2
+	milestonefile=$name-milestones-3b
+	refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd10-amber" ]; then
+	pathwayfile=$name-pathway-23-energy2
+	milestonefile=$name-milestones-2-energy2
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+else
+	echo "unrecognized system name"
+	exit
+fi
+
+
+
+line=`awk -v i=$milestone '($1==i) {print $0}' $milestonefile`
+ianchor=`echo $line | awk '{print $2}'`
+janchor=`echo $line | awk '{print $3}'`
+nanchor=`wc -l $pathwayfile | awk '{print $1}'`
+
+#these are in ns and must match the section length and interval between frames
+section_length=0.01
+dt=0.001
+endframe=`echo $section_length $dt | awk '{print int($1/$2)}'`
+
+#this file will be the source data from which K and average times will be calculated
+logfile=$name-log 
+if [ ! -s "$logfile" ]; then
+	touch $logfile
+fi
+
+#check to see if this simulation is already done
+n=`awk -v i=$ianchor -v j=$janchor -v id=$id '($2==i) && ($3==j) && ($4==id)' $logfile | wc -l`
+if [ "$n" -gt "0" ]; then
+	echo "this simulation already done, exiting"
+	exit
+fi
+
+#determine the actual starting section, skipping over any that have already been completed
+actualstart=$start
+while true;
+do
+	n=`grep -ci "CPUTime" io/$name-milestone-$ianchor-$janchor-id-$id-$actualstart.out`
+	if [ "$?" != "0" ]; then
+		break
+	fi
+	if [ "$n" -eq "0" ]; then
+		break
+	fi
+	actualstart=`expr $actualstart + 1`
+done
+
+for section in `seq $actualstart $end`
+do
+
+	#wait for disk space to become available
+	#kblimit=`expr 95 \* 1024 \* 1024`
+	#interval=60
+	#maxcycle=`expr 4 \* 3600 / $interval`
+	#ok="no"
+	#for cycle in `seq 1 $maxcycle`
+	#do
+	#	kb=`lfs quota /scratch/jmsc87 | head -n3 | tail -n1 | awk '{print $2}'`
+	#	if [ "$kb" -lt "$kblimit" ]; then
+	#		ok="yes"
+	#		break
+	#	fi
+	#	echo "$name milestone ${ianchor}-${janchor} waiting for disk space cycle $cycle kb $kb"
+	#	sleep $interval
+	#done
+	#if [ "$ok" == "no" ]; then
+	#	echo "$name milestone ${ianchor}-${janchor} waited too long for disk space; giving up"
+	#	exit -1
+	#fi
+
+	#prepare and run MD for this section
+	export name
+	export ianchor
+	export janchor
+	export id
+	export section
+	export scratch
+	export storage
+	
+	echo "beginning MD for milestone $ianchor $janchor id $id section $section at `date`"
+	output=io/$name-milestone-$ianchor-$janchor-id-$id-$section.out
+	namd3 +p${nprocs} +setcpuaffinity pyk2-run-milestoning.inp > $output
+	status=$?
+	if [ "$status" -ne "0" ]; then
+		echo "error in MD for milestone $ianchor $janchor id $id section $section at `date`"
+		break
+	fi
+
+        #get last frame as a pdb
+	dcd_with_water=$storage/dcd/$name-milestone-$ianchor-$janchor-id-$id-$section.dcd
+        psf_water=../solvate/prmtop/$name-milestone-$ianchor-$janchor-solvated.prmtop
+
+	#use catdcd to strip water molecules from trajectory -- the protein/ligand atoms are the same in each prmtop
+	atoms=data/atoms-$name
+	if [ ! -s "$atoms" ]; then
+                awk '/ATOM/ {res=substr($0,18,3); n=substr($0,7,5)-1;  if ((res!="WAT") && (res!="Na+") && (res!="Cl-")) print n}' \
+                        $refpdb > $atoms
+        fi
+	dcd_no_water=$storage/dcd-nowater/$name-milestone-$ianchor-$janchor-id-$id-$section-nowater.dcd
+        ~/catdcd/catdcd -o ${dcd_no_water} -otype dcd -i $atoms ${dcd_with_water}
+        status=$?
+	#transfer the with-water dcd to our lab's computers and remove it
+	#if [ "$status" -eq "0" ]; then
+	#	dest_dcd=$destpath/dcd/$name-milestone-$ianchor-$janchor-id-$id-$section.dcd
+	#	~/transfer-it ${dcd_with_water} $dest_dcd
+	#	status=$?
+	#fi
+
+	#we cannot remove the dcd with water now, we may need it later for the end frame
+
+	#get last frame as a pdb	
+	#lastframe=$scratch/dcd/$name-milestone-$ianchor-$janchor-id-$id-$section-lastframe.pdb
+	#~/catdcd/catdcd -o $lastframe -otype pdb -s ${psf_water} -stype parm7 -first $endframe -last $endframe $dcd_with_water
+
+	#call check-trajectory.py to analyze trajectory and determine if the simulation should continue
+	echo "beginning analysis for milestone $ianchor $janchor id $id section $section at `date`"
+	tmpfile=`mktemp`
+	psf_no_water=prmtop/$name.prmtop
+	./check-trajectory.py $nanchor $pathwayfile $ianchor $janchor ${psf_no_water} $refpdb ${dcd_no_water} | tee $tmpfile
+	check_result=`tail -n1 $tmpfile`
+	
+	#in either case, transfer the no-water trajectory to foundry to conserve disk space
+	#destdcd=$destpath/dcd/$name-milestone-$ianchor-$janchor-id-$id-$section-nowater.dcd
+	#~/transfer-to-foundry ${dcd_no_water} $destdcd
+	#destframe=$destpath/frames/$name-milestone-$ianchor-$janchor-id-$id-$section-lastframe.pdb
+	#~/transfer-to-foundry $lastframe $destframe
+
+	word=`echo ${check_result} | awk '{print $1}'`
+	if [ "$word" == "STOP" ]; then
+		#simulation is stopping. decode the result (see print statement in check-trajectory.py) 
+		frame=`echo ${check_result} | awk '{print $2}'`
+		inewanchor=`echo ${check_result} | awk '{print $3}'`
+		jnewanchor=`echo ${check_result} | awk '{print $4}'`
+		#check to see if this is a "new" milestone or not
+		isnew=""
+		newid=0 #make sure stoptime is in the same column 
+		n=`awk -v i=$inewanchor -v j=$jnewanchor '($2==i) && ($3==j)' $milestonefile | wc -l`
+		if [ "$n" -eq "0" ]; then
+			#it is a new milestone
+			echo "new milestone $inewanchor $jnewanchor detected"
+			isnew="new"
+
+			#write out the ending frame, giving it a new id to make it unique
+			newid=1
+			while true
+			do
+				endframe=$scratch/end-frames/$name-milestone-$inewanchor-$jnewanchor-id-$newid-endframe.pdb
+				if [ ! -s "$endframe" ]; then
+					break
+				fi
+				newid=`expr $newid + 1`
+			done
+			~/catdcd/catdcd -o $endframe -otype pdb -s ${psf_water} -stype parm7 -first $frame -last $frame $dcd_with_water
+		fi
+
+		#calculate the amount of simulated time from section and frame number -- this is in ns
+		#record in log file
+		stoptime=`echo "( $section - 1 ) * ${section_length} + $frame * $dt" | bc`
+		line="$name $ianchor $janchor $id $inewanchor $jnewanchor $newid $stoptime $isnew"
+		#try to lock the file to make sure no other simulations write to it at the same time (avoid corruption)
+		flock $logfile -c "echo $line >> $logfile"
+
+		#remove last all-water dcd -- we don't need to do this, storage has enough space
+		#"status" was previously set with the transfer above
+		#if [ "$status" -eq "0" ]; then
+		#	rm -v ${dcd_with_water}
+        	#fi
+
+		#join all no-water sections together and put them in joined; if successful, remove individual segments
+		files=""
+		for isec in `seq 1 $section`
+		do
+
+			file=$storage/dcd-nowater/$name-milestone-$ianchor-$janchor-id-$id-$isec-nowater.dcd
+	                files="$files $file"
+		done
+		dcd_joined=$storage/dcd-joined/$name-milestone-$ianchor-$janchor-id-$id-nowater.dcd
+		~/catdcd/catdcd -o ${dcd_joined} -otype dcd $files
+		status=$?
+		if [ "$status" -eq "0" ]; then
+			for f in $files
+			do
+				rm -v $f
+			done
+		fi
+		dest_dcd_joined=$destpath/dcd-joined/$name-milestone-$ianchor-$janchor-id-$id-nowater.dcd
+		#~/transfer-it ${dcd_joined} ${dest_dcd_joined}
+	
+		#make a tarball out of restart files for this simulation, and if possible transfer it 
+		#this seems to be time consuming
+		#tarball=$name-milestone-$ianchor-$janchor-id-$id-restart.tar.gz
+		#workdir=`pwd`
+		#cd $storage/data
+		#tar -czvf $tarball --remove-files $name-milestone-$ianchor-$janchor-id-$id-*.coor \
+		#	$name-milestone-$ianchor-$janchor-id-$id-*.vel $name-milestone-$ianchor-$janchor-id-$id-*.xsc
+		#~/transfer-it $tarball $destpath/data/$tarball
+		#status=$?
+		#if [ "$status" -eq "0" ]; then
+		#	rm -v $tarball
+		#fi
+		#cd $workdir
+
+		#and stop the simulation
+		echo "ending simulation for milestone $ianchor $janchor id $id at `date`"
+		break
+	else
+		#simulation will continue, need to remove all-water dcd 
+		#if [ "$status" -eq "0" ]; then
+		#	rm -v ${dcd_with_water}
+		#fi
+		echo "ending cycle for milestone $ianchor $janchor id $id section $section at `date`"
+	fi
+done

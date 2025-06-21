@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-umbrella-heat
+#SBATCH --time=0-24:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --array 1-452
+
+
+
+
+module purge 
+module load namd
+ 
+nprocs=$SLURM_NTASKS
+
+
+# this has to be changed - notice the number of CPUs +p12
+#namd2  +p12 fak-time-test.inp | tee io/fak-cpd32-cgenff-time-test-lewis-3gpu-${nprocs}.out 
+
+line=`head -n$SLURM_ARRAY_TASK_ID list | tail -n1`
+export name=`echo $line | awk '{print $2}'`
+#export force=`echo $line | awk '{print $3}'`
+export window=`echo $line | awk '{print $3}'`
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/
+
+#parameters: name, section, window number, num. processors
+start=`./find-start $name $window $scratch`
+for section in `seq $start 10`
+do
+  	./do5 $name $window $section $nprocs $scratch
+done
+

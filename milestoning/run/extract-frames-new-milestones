@@ -1,0 +1,56 @@
+#!/bin/bash
+
+name=$1
+milestonefile=$name-new-milestones
+logfile=$name-log
+nline=`wc -l $milestonefile | awk '{print $1}'`
+scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning
+dt=0.001
+section_length=0.01
+cp ../heat/$name-box-lengths .
+
+for iline in `seq 1 $nline`
+do
+	line=`head -n$iline $milestonefile | tail -n1`
+	imilestone=`echo $line | awk '{print $1}'`
+	inewanchor=`echo $line | awk '{print $2}'`
+	jnewanchor=`echo $line | awk '{print $3}'`
+	#check to see if there is already a prmtop file for this new simulation
+	newprmtop=../solvate/prmtop/$name-milestone-$inewanchor-$jnewanchor-solvated.prmtop
+	#if [ -s $newprmtop ]; then
+		#already done
+	#	continue
+	#fi
+	#locate the first simulation in the log which ended on this milestone
+	line2=`awk -v i=$inewanchor -v j=$jnewanchor '($5==i) && ($6==j)' $logfile | head -n1`
+	ianchor=`echo $line2 | awk '{print $2}'`
+	janchor=`echo $line2 | awk '{print $3}'`
+	id=`echo $line2 | awk '{print $4}'`
+	stoptime=`echo $line2 | awk '{print $8}'`
+	echo $imilestone $inewanchor $jnewanchor $ianchor $janchor $id $stoptime
+	#copy the old prmtop file to the new one
+	oldprmtop=../solvate/prmtop/$name-milestone-$ianchor-$janchor-solvated.prmtop
+	cp -v $oldprmtop $newprmtop
+	#echo $oldprmtop $newprmtop
+	#locate the last section 
+	#sec=1
+	#while true; do
+	#	dcdname=$scratch/dcd/$name-milestone-$ianchor-$janchor-id-$id-$sec.dcd
+	#	if [ ! -s "$dcdname" ]; then
+	#		break
+	#	fi
+	#	sec=`expr $sec + 1`
+	#done
+	#sec=`expr $sec - 1`
+	sec=`awk -v stoptime=$stoptime -v sl=${section_length} 'BEGIN {x=stoptime/sl; if (x>int(x)) x+=1; print int(x)}'`
+	dcdname=$scratch/dcd/$name-milestone-$ianchor-$janchor-id-$id-$sec.dcd
+	echo $dcdname
+	#redetermine the ending frame from the stop time
+	frame=`awk -v stoptime=$stoptime -v dt=$dt -v sl=${section_length} 'BEGIN {n=int(sl/dt); x=int(stoptime/dt)%n; if (x==0) x=n; print x}'`
+	endframe=../ref/$1-milestone-$inewanchor-$jnewanchor-solvated-ref.pdb
+	~/catdcd/catdcd -o temp.pdb -otype pdb -s $oldprmtop -stype parm7 -first $frame -last $frame $dcdname
+	awk -f ../solvate/setup-ref.awk temp.pdb | awk '{print substr($0,1,21)" "substr($0,23,80)}' > $endframe
+        boxl=`tail -n1 $scratch/equil-data/$name-milestone-$ianchor-$janchor-equil.xsc | awk '{print $2}'`
+        echo "$inewanchor $jnewanchor $boxl" >> $name-box-lengths
+
+done

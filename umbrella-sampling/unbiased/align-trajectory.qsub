@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-umbrella-heat
+#SBATCH --time=0-8:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem=131072
+module load vmd
+#name=pyk2-cpd1-amber
+name=pyk2-cpd10-amber
+#nsim=5
+#iwindow=$SLURM_ARRAY_TASK_ID
+#for id in `echo "11 22 46 64 73 87 98 121 138 143 164 347 409"` #`seq 1 $nsim`
+for id in `echo "1 2 3 4 5"` #10 24 52 72 82 95 136 164 166 190 239 270 310 393 411 418"`
+do
+	./remove-water $name $id
+	./join-amber $name $id
+
+	#windows=$name-tramd-windows-rel-to-first
+	#datafile=data-rel-to-first/$name-tramd-com-$iwindow
+	dcdfile=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber/dcd-joined/$name-tramd-id-$id-nowater.dcd
+	dcdfile2=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber/dcd-joined/$name-tramd-id-$id-aligned.dcd
+	reffile=../ref/$name-tramd-window-1-ref.pdb
+	#com=`awk -v i=$iwindow '($1==i) {print $2,$3,$4}' $windows`
+	vmd -eofexit -dispdev text -e align-trajectory.tcl -args $name.prmtop $dcdfile $reffile $dcdfile2
+done

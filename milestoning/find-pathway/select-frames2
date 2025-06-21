@@ -1,0 +1,23 @@
+#!/bin/bash
+
+name=$1
+#milestonefname=$name-milestones-2
+milestonefname=$2
+nmilestone=`wc -l $milestonefname | awk '{print $1}'`
+
+for milestone in `seq 1 $nmilestone`
+do
+	line=`awk -v i=$milestone '($1==i) {print $0}' $milestonefname`
+	ianchor=`echo $line | awk '{print $2}'`
+	janchor=`echo $line | awk '{print $3}'`
+	window=`echo $line | awk '{print $4}'`
+	frame=`echo $line | awk '{print $5}'`
+	#framep1=`expr $frame + 1`
+	traj=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/dcd-joined/$name-tramd-window-$window-aligned.dcd
+	output=frames/$name-milestone-$ianchor-$janchor-start.pdb
+	prmtop=~/pyk2/umbrella-amber/anal3/prmtop/$name.prmtop
+	#~/catdcd/catdcd -o $output -otype pdb -s $prmtop -stype parm7 -first $frame -last $frame $traj
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+	vmd -eofexit -dispdev text -e align-frame.tcl -args $refpdb $prmtop $traj $frame $output 
+	#exit
+done

@@ -1,0 +1,48 @@
+#!/bin/bash
+
+name=$1
+iwindow=$2
+nproc=$3
+if [ "$nproc" == "" ]; then
+	nproc=1
+fi
+
+dir=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/dcd-joined/
+tempdir=/lustre/scratch/jmsc87/pyk2/umbrella-amber/mmpbsa-temp/
+if [ "$name" == "pyk2-cpd1-amber" -o "$name" == "pyk2-cpd10-amber" ]; then
+	traj=$dir/$name-tramd-window-$iwindow-aligned.dcd
+else
+	traj=$dir/$name-window-$iwindow-aligned.dcd
+fi
+
+#create receptor and ligand prmtop files using "dry" complex toplogy
+startdir=`pwd`
+complex_prmtop=$startdir/prmtop/$name.prmtop
+receptor_prmtop=$startdir/prmtop2/$name-receptor.prmtop
+ligand_prmtop=$startdir/prmtop2/$name-ligand.prmtop
+output=$name-window-$iwindow-inte-anal
+
+#prefix=$tempdir/_MMPBSA-${name}-${iwindow}_
+if [ ! -s "$receptor_prmtop" ]; then
+	$AMBERHOME/bin/ante-MMPBSA.py --prmtop=${complex_prmtop} --receptor-prmtop=${receptor_prmtop} --ligand-prmtop=${ligand_prmtop} \
+		--ligand-mask=':CPD' --radii=mbondi3
+fi
+#exit
+#use a separate directory for each calculation, to keep them isolated and ensure that reference.frc is on lustre
+mkdir $tempdir/$name-$iwindow/
+cd $tempdir/$name-$iwindow/
+pwd
+#make a private copy of all the prmtops
+cp -v $complex_prmtop .
+cp -v $receptor_prmtop .
+cp -v $ligand_prmtop .
+
+complex_prmtop=$name.prmtop
+receptor_prmtop=$name-receptor.prmtop
+ligand_prmtop=$name-ligand.prmtop
+
+mpirun -n $nproc $AMBERHOME/bin/MMPBSA.py.MPI -O -i $startdir/mmpbsa.in -eo $output \
+	-cp ${complex_prmtop} -rp ${receptor_prmtop} -lp ${ligand_prmtop} -y $traj
+
+cp -v $output $tempdir/an/
+cd $startdir

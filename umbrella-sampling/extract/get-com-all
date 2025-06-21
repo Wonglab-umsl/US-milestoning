@@ -1,0 +1,11 @@
+#!/bin/bash
+
+name=$1
+outfname=$name-com-all
+rm $outfname
+n=`wc -l dcd-files | awk '{print $1}'`
+for i in `seq 1 $n`
+do
+	dcdfile=`head -n$i dcd-files | tail -n1`
+	~/vmd/vmd -eofexit -dispdev text -e get-relative-com3.tcl -args ref.prmtop $dcdfile $name.pdb $outfname
+done

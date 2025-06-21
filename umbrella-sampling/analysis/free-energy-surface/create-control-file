@@ -1,0 +1,20 @@
+#!/bin/bash
+
+name=$1
+file=$name-control-file
+nwindow=$2
+windows=$name-windows-rel-to-first
+#number of windows, max data points, start time (ns), end time (ns), histogram resolution, beta, max WHAM iterations, convergence tolerance
+echo "$nwindow 10000 1 20 0.5 1.677491781 10000 0.001" > $file
+for iwindow in `seq 1 $nwindow`
+do
+	datafile=data-rel-to-first/$name-com-$iwindow
+	#dcdfile=/mnt/stor/scratch/jmsc87/fak/umbrella-facts/dcd/$name-facts-window-$iwindow-1.dcd
+	#dcdfile=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber/dcd/$name-window-$iwindow-nowater.dcd
+	#reffile=../ref/$name-window-$iwindow-ref.pdb
+	com=`awk -v i=$iwindow '($1==i) {print $2,$3,$4}' $windows`
+	#~/vmd/vmd -eofexit -dispdev text -e get-relative-com3.tcl -args $name.prmtop $dcdfile $reffile $datafile $com
+	#force constant, center of mass
+	echo "2.0 $com" >> $file
+	echo "$datafile" >> $file
+done

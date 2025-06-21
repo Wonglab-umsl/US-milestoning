@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-umbrella-heat
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem=4096
+
+module load vmd
+name=pyk2-cpd2-amber
+#iwindow=$SLURM_ARRAY_TASK_ID
+~/tools/wham3d-1d3 $name-control-file $name-explicit-wham-fe-rel-to-first $name-explicit-wham-fe-rel-to-first.dx

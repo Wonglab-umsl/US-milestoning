@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-run-unbiased
+#SBATCH --time=7-0:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --array=10,24,52,72,82,95,136,164,166,190,239,270,310,393,411,418
+
+
+
+module purge 
+module load namd
+ 
+nprocs=$SLURM_NTASKS
+
+export name=pyk2-cpd10-amber
+export id=$SLURM_ARRAY_TASK_ID
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber
+
+#parameters: name, section, window number, num. processors
+start=`./find-start $name $id $scratch`
+for section in `seq $start 20`
+do
+  	./do5 $name $id $section $nprocs $scratch
+done
+

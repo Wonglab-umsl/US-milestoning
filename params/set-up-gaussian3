@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#cpd=$1
+for cpd in `echo "cpd2 cpd3 cpd5 cpd6 cpd8 cpd11 cpd12 cpd12n"`
+#for cpd in `echo "cpd2"` #cpd5 cpd6 cpd12 cpd12n"`
+do
+	echo $cpd
+	q=0
+	if [ "$cpd" == "cpd12" ]; then
+		q=1
+	fi
+
+	mkdir $cpd
+	cp -v $cpd.mol2 $cpd/
+	cd $cpd/
+	antechamber -i $cpd.mol2 -fi mol2 -o $cpd.inp -fo gcrt -nc $q -ch "$cpd-hf-midix.chk" -gm "%mem=1000MB" -gn "%nproc=32" \
+		-gv 1 -ge "$cpd.gesp"
+
+	#change the first "#" to "#P" in order to enable verbose output in Gaussian
+	awk 'BEGIN {flag=1} (flag && substr($0,1,1)=="#") {print "#P HF/MIDIX SCF=tight opt=(calcfc,tight)"; flag=0; next} \
+		 (substr($0,1,1)!="#") {print $0}' $cpd.inp > ${cpd}-hf-midix.inp
+	awk 'BEGIN {flag=1} (flag && substr($0,1,1)=="#") {print "#P "substr($0,2,255); flag=0; next} (NF!=4) || ($1=="remark") {print $0}' $cpd.inp | \
+		sed -e 's/opt/geom=check guess=read opt=(calcfc,tight)/g' -e 's/hf-midix/hf/g'  > ${cpd}-hf.inp
+	cd ..
+done

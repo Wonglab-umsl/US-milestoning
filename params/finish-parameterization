@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#cpd=$1
+for cpd in `echo "cpd2 cpd3 cpd5 cpd6 cpd8 cpd11 cpd12 cpd12n"`
+do
+	echo $cpd
+	q=0
+	if [ "$cpd" == "cpd12" ]; then
+		q=1
+	fi
+
+	#mkdir $cpd
+	#cp -v $cpd.mol2 $cpd/
+	cd $cpd/
+	#this performs RESP fitting to determine charges
+	antechamber -i ${cpd}.gesp -fi gesp -o ${cpd}-resp.mol2 -fo mol2 -c resp -eq 2 -nc $q -rn CPD
+	#this re-maps the atom names from the original mol2 (which came from the PDB file)
+	#antechamber -i ${cpd}-resp.mol2 -fi mol2 -a ${cpd}.mol2 -fa mol2 -ao name -o ${cpd}-resp2.mol2 -fo mol2 -rn CPD
+	#instead we need to remap the charges back onto the original molecule, in order to preserve the names and the coordinates
+	antechamber -i ${cpd}.mol2 -fi mol2 -a ${cpd}-resp.mol2 -fa mol2 -ao crg -o ${cpd}-resp2.mol2 -fo mol2 -rn CPD
+	parmchk2 -i ${cpd}-resp2.mol2 -o ${cpd}.frcmod -f mol2
+	cd ..
+	cp -v ${cpd}/${cpd}-resp2.mol2 params/
+	cp -v ${cpd}/${cpd}.frcmod params/
+done

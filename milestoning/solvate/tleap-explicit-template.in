@@ -1,0 +1,24 @@
+#source /home/jmsc87/miniconda3/pkgs/ambertools-20.15-py37hc295af0_1/dat/leap/cmd/leaprc.protein.ff14SB
+#source /home/jmsc87/miniconda3/pkgs/ambertools-20.15-py37hc295af0_1/dat/leap/cmd/leaprc.gaff
+logFile io/tleap-explicit-milestone-:ianchor;-:janchor;.out
+source leaprc.protein.ff14SB
+source leaprc.water.tip3p
+source leaprc.gaff
+loadamberparams frcmod.ionsjc_tip3p
+loadamberparams params/:cpd;.frcmod
+#need to replace INH->CPD
+loadoff params/:cpd;.lib
+#CPD = loadMol2 params/:cpd;.mol2
+
+#need to replace HSD->HID, HSE->HIE, CD  ILE->CD1 ILE
+#also need to insert "TER" at end of protein before ligand
+complex  = loadpdb frames2/:name;-milestone-:ianchor;-:janchor;-start.pdb
+check complex
+solvateBox complex TIP3PBOX 14 1.0
+charge complex
+addionsrand complex Na+ :nna; Cl- :ncl;
+charge complex
+#check complex
+saveamberparm complex data/:name;-milestone-:ianchor;-:janchor;-solvated.prmtop data/:name;-milestone-:ianchor;-:janchor;-solvated.inpcrd
+savepdb complex data/:name;-milestone-:ianchor;-:janchor;-solvated.pdb
+quit

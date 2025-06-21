@@ -1,0 +1,57 @@
+#! /bin/bash
+
+#SBATCH --job-name=pyk2-umbrella-heat 
+#SBATCH --time=0-12:00:00 
+##SBATCH --mail-type=begin,end,fail,requeue 
+#SBATCH --export=all 
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=16
+#SBATCH --array 1-452
+
+
+
+module purge 
+#unset MODULEPATH
+#source /cluster/spack-2020/opt/spack/linux-centos7-x86_64/gcc-6.3.0/lmod-8.1.5-w5bf3f6lvfzxk6vmeaagqkjof47zl3yn/lmod/lmod/init/bash
+#module use /cluster/spack-2020/share/spack/lmod/linux-centos7-x86_64/Core
+
+module load namd/2.14
+
+nprocs=$SLURM_NTASKS
+export name=pyk2-cpd10-amber
+export window=$SLURM_ARRAY_TASK_ID
+export boxl=`awk -v i=$window '($1==i) {print $2}' $name-box-lengths`
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3
+#export PATH=/home/plmx7/data/TICKETS_LAZIC/NAMD_JUSTIN/TRY_NAMD_WITH_OPENMPI_SYSTEM_unified_1_2020/
+#export PATH=${HOME}/NAMD_2.13_Source/Linux-x86_64-g++_CUDA:$PATH
+
+# this has to be changed - notice the number of CPUs +p12
+#namd2  +p12 pyk2-time-test.inp | tee io/pyk2-cpd32-cgenff-time-test-lewis-3gpu-${nprocs}.out 
+
+output=io/$name-tramd-window-$window-min.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd2 +p${nprocs} +setcpuaffinity pyk2-umbrella-minimize-amber.inp | tee $output
+fi
+mv -v data/$name-tramd-window-$window-min.pdb.coor  $scratch/heat-data/$name-tramd-window-$window-min.pdb
+mv -v data/$name-tramd-window-$window-min.pdb   $scratch/heat-data/$name-tramd-window-$window-min.pdb
+output=io/$name-tramd-window-$window-heat.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd2 +p${nprocs} +setcpuaffinity pyk2-umbrella-heat-amber.inp | tee $output
+fi
+output=io/$name-tramd-window-$window-equil.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd2  +p${nprocs} +setcpuaffinity pyk2-umbrella-equil-amber.inp | tee $output
+fi

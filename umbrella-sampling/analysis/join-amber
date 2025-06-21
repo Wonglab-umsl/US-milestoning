@@ -1,0 +1,24 @@
+#!/bin/bash
+
+name=$1
+window=$2
+section=1
+files=""
+dir=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/dcd
+dir2=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/dcd-joined
+mkdir -p $dir2
+
+while true;
+do
+	file=$dir/$name-tramd-window-$window-$section-nowater.dcd
+	if [ ! -s "$file" ]; then
+		break
+	fi
+	files="$files $file"
+	section=`expr $section + 1`
+done
+echo $files
+if [ "$files" != "" ]; then
+	output=$dir2/$name-tramd-window-$window-nowater.dcd
+	~/catdcd/catdcd -o $output -otype dcd $files
+fi

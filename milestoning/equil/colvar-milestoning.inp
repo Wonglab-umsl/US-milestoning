@@ -1,0 +1,42 @@
+# Example: defining a group "atoms", with its coordinates expressed
+# on a roto-translated frame of reference defined by a second group
+#set name $env(name)
+colvarsTrajFrequency 500
+#the occupancy column has been set to 1 for the drug
+#the beta column has been set to 1 for the backbone atoms
+
+colvar {
+	name com_dist
+	distance {
+		group1 {
+			atomsFile :refpdb;
+			atomsCol O
+			centerReference yes
+  			rotateReference yes
+			refPositionsFile :refpdb;
+			refPositionsCol B
+  			refPositionsGroup {
+				atomsFile :refpdb;
+				atomsCol B
+				#refPositionsFile :refpdb; 
+				#refPositionsCol B
+			}
+		}
+		group2 {
+			#the starting config was taken from frame 785 in the pulling trajectory
+			#this is time 784 ps in the time series
+                        dummyAtom (:com;)
+                        #dummyAtom (17.899, -6.055, -53.809)
+			#dummyAtom (21.959157943725586,-4.635423183441162,-57.1266975402832)
+		}
+	}
+}
+
+harmonic {
+	colvars com_dist
+	centers 0.0
+	forceConstant :k;
+	outputEnergy on
+	#centers [16.922 -6.589 -54.125]
+} 
+

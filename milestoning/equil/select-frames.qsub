@@ -1,0 +1,59 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-milestoning-select-frames
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --array=93-94
+#SBATCH --mem=4096
+
+
+
+module purge 
+module load anaconda
+
+
+name=pyk2-cpd10-amber
+if [ "$name" == "pyk2-cpd1-amber" ]; then
+        pathwayfile=$name-pathway-4
+        milestonefile=$name-milestones-3
+        refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd2-amber" ]; then
+        pathwayfile=$name-pathway-15
+        milestonefile=$name-milestones-2
+        refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd2-charmm" ]; then
+	pathwayfile=$name-pathway-15
+	milestonefile=$name-milestones-1
+	refpdb=../ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd8-amber" ]; then
+        pathwayfile=$name-pathway-2
+        milestonefile=$name-milestones-3
+        refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd10-amber" ]; then
+	pathwayfile=$name-pathway-23-energy2
+	milestonefile=$name-milestones-2-energy2
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+else
+        echo "unrecognized system name"
+        exit
+fi
+
+milestone=$SLURM_ARRAY_TASK_ID
+line=`awk -v i=$milestone '($1==i) {print $0}' $milestonefile`
+nanchor=`wc -l $pathwayfile | awk '{print $1}'`
+#nanchor=61
+ianchor=`echo $line | awk '{print $2}'`
+janchor=`echo $line | awk '{print $3}'`
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning
+export storage=$scratch
+#export id=1
+nsim=100
+if [ -s "$scratch/start-frames/$name-milestone-$ianchor-$janchor-start-id-$nsim.pdb" ]; then
+        #already done
+        echo "already done, exiting"
+        exit
+fi
+
+./select-starting-frames2.py $name $nanchor $pathwayfile $ianchor $janchor $nsim

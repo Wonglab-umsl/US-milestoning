@@ -1,0 +1,62 @@
+#!/bin/bash
+
+name=$1
+ncol=1
+if [ "$#" -ge "2" ]; then
+	ncol=$2
+fi
+windowfile=$name-tramd-windows-rel-to-first
+goal=10
+nwindow=`wc -l $windowfile | awk '{print $1}'`
+totaltime=0
+totalspeed=0
+donelist=""
+counter=1
+for window in `seq 1 $nwindow`
+do
+	maxstep=0
+	section=1
+	#for section in `seq 1 5`
+	speed=""
+	while true;
+	do
+		file=io/$name-tramd-window-$window-$section.out
+		if [ -s "$file" ]; then
+	                line=`grep -i "energy:" $file | tail -n1`
+               		if [ "$line" != "" ]; then
+    				maxstep=`grep -i "energy:" $file | tail -n1 | awk -v m=$maxstep ' {s=$2+0; if ((NF>0) && (s>m)) print s; else print m}'`
+				n=`grep -ci "cputime" $file`
+				if [ "$n" -eq "0" ]; then
+					speed=`grep -i "timing:" $file | tail -n1 | awk '{pos=index($8,"/"); speed=substr($8,0,pos-1)+0; speed=(86400/speed)*2e-6; printf("%4.2f",speed)}'`
+				fi
+			fi
+		else
+			break
+		fi
+		section=`expr $section + 1`
+	done
+	time=`echo $maxstep | awk '{if ($1>0) time=$1*2e-6-1.0; else time=0; printf("%4.2f",time)}'`
+	eta=""
+	if [ "$speed" != "" ]; then
+		eta=`echo $time $speed $goal | awk '{eta=systime()+86400*($3-$1)/$2; print strftime(PROCINFO["strftime"],eta)}'`
+		totalspeed=`echo $totalspeed $speed | awk '{printf("%4.2f",$1+$2)}'`
+	fi 
+	totaltime=`echo $totaltime $time | awk '{printf("%4.2f",$1+$2)}'`
+	if [ "$maxstep" -gt "0" ]; then
+		done=`echo "$time $goal" | awk '{print ($1>=$2)}'`		
+		if [ "$done" -eq "0" ]; then
+			m=`expr $counter % $ncol`
+			if [ "$m" == "0" ]; then
+				printf "%2d %8d %6s %6s %s\n"  $window $maxstep $time $speed "$eta"
+			else
+				printf "%2d %8d %6s %6s %s      "  $window $maxstep $time $speed "$eta"
+			fi
+			counter=`expr $counter + 1`
+		else
+			donelist="$donelist $window"
+		fi
+	fi
+done
+echo ""
+echo "done: $donelist"
+echo "Total $totaltime ns  --  Total speed $totalspeed ns/day"

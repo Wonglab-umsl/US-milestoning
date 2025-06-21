@@ -1,0 +1,11 @@
+#!/bin/bash
+
+module load vmd
+#all the arguments are hard coded
+vmd -eofexit -dispdev text -e draw-pathways-alone.tcl
+for fmt in `echo "png pdf"`
+do
+	convert images/pyk2-allcpds-pathways.tga images/pyk2-allcpds-pathways.$fmt
+	convert images/pyk2-allcpds-pathways-side.tga images/pyk2-allcpds-pathways-side.$fmt
+done
+

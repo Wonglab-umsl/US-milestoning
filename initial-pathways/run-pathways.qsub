@@ -1,0 +1,57 @@
+#!/bin/bash
+#SBATCH --job-name=do2-test-run
+#SBATCH --time=4-0:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=64
+#SBATCH --array=1
+module load namd
+
+cpd=`echo "cpd2 cpd3 cpd5 cpd6 cpd8 cpd11 cpd12 cpd12n" | awk -v i=$SLURM_ARRAY_TASK_ID '{print $i}'`
+export name=pyk2-$cpd-amber
+export log=log-$name
+if [ ! -e "$log" ]; then
+	touch $log
+fi
+
+#./copy-over $name
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/pathways/test-run2c-explicit
+mkdir -p $scratch
+mkdir -p $scratch/data
+mkdir -p $scratch/dcd
+./copy-over $name
+nseg=16
+#this is the number of simulations to start
+nstart=4
+nprocs=`expr $SLURM_NTASKS "/" $nseg`
+for iter in `seq 1 200`
+do
+	echo "beginning iteration $iter at `date`"
+	for seg in `seq 1 $nseg`
+	do
+		export iter
+		export seg
+		if [ "$iter" -gt "1" ]; then
+			#read the previous iteration and segment from log and export them
+			#format of log file: name, iteration, segment, previous iteration, parent segment
+			prevseg=`awk -v name=$name -v iter=$iter -v seg=$seg '($1==name) && ($2==iter) && ($3==seg) {print $5}' $log | tail -n1`
+			if [ "$prevseg" == "" ]; then
+				echo "previous simulation selection failed"
+				exit
+			fi
+			export prevseg
+		fi
+		output=io/$name-$iter-$seg.out
+		#srun --ntasks=$nprocs --nodes=1 --export=all --cpu-bind=verbose namd2 +p${nprocs} segment.inp > $output 
+		#startcpu=`expr "(" $seg - 1 ")" "*" $nprocs`
+		#endcpu=`expr $startcpu +  $nprocs - 1`
+		namd2 +p${nprocs}  segment-explicit.inp > $output &
+	done
+	wait
+	#choose which simulations to continue and how many replicates of each
+	#and determine next iterations/segments and put in log.
+	./select-new-simulations.py $name $iter $nseg $nstart $log
+	echo "ending iteration $iter at `date`"
+done

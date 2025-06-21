@@ -1,0 +1,23 @@
+#!/bin/bash
+
+mkdir qsub
+name=pyk2-cpd10-amber
+milestonefile=$name-milestones-2-energy2
+jobslist=$name-jobs
+list="`seq 93 94`"
+array="1-100"
+##list=`echo "1"`
+for imilestone in `echo $list`
+do
+	line=`awk -v i=$imilestone '($1==i) {print $0}' $milestonefile`
+	ianchor=`echo $line | awk '{print $2}'`
+	janchor=`echo $line | awk '{print $3}'`
+	echo $imilestone $ianchor $janchor
+	#continue
+	sed -e "s/:milestone;/$imilestone/g" -e "s/:array;/$array/g" -e "s/:ianchor;/$ianchor/g" -e "s/:janchor;/$janchor/g" \
+		pyk2-run-milestoning-foundry.qsub > qsub/pyk2-run-milestoning-foundry-$imilestone.qsub
+	#continue
+	job=`sbatch qsub/pyk2-run-milestoning-foundry-$imilestone.qsub`
+	job=`echo $job | awk '{print $NF}'`
+	echo $imilestone $job | tee -a $jobslist
+done

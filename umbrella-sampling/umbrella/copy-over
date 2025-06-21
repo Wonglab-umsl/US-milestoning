@@ -1,0 +1,17 @@
+#!/bin/bash
+
+name=$1
+#force=$2
+nwindow=$2
+scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3/
+mkdir -p $scratch
+mkdir -p $scratch/data
+mkdir -p $scratch/dcd
+#for i in `seq 1 $nwindow`
+for i in `echo "10 24 52 72 82 95 136 164 166 190 239 270 310 393 411 418"`
+do
+	for x in `echo "coor vel xsc"`
+	do
+		cp -v $scratch/heat-data/$name-tramd-window-$i-equil.$x $scratch/data/$name-tramd-window-$i-0.$x
+	done
+done

@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --job-name=do-gaussian
+#SBATCH --time=0-24:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --out=Foundry-%j.out
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --array 1
+
+module load gaussian
+export GAUSS_SCRDIR=/mnt/stor/ceph/scratch/jmsc87/gaussian-scratch
+mkdir $GAUSS_SCRDIR
+cpd=`echo "cpd2 cpd3 cpd5 cpd6 cpd8 cpd11 cpd12 cpd12n" | awk -v i=$SLURM_ARRAY_TASK_ID '{print $i}'`
+cd $cpd
+n=0
+output=${cpd}-hf-midix.log
+if [ -s "$output" ]; then
+	n=`grep -ci "Normal termination" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	g09 ${cpd}-hf-midix.inp
+fi
+cp ${cpd}-hf-midix.chk ${cpd}-hf.chk
+n=0
+output=${cpd}-hf.log
+if [ -s "$output" ]; then
+        n=`grep -ci "Normal termination" $output`
+fi
+if [ "$n" -eq "0" ]; then
+        g09 ${cpd}-hf.inp
+fi
+

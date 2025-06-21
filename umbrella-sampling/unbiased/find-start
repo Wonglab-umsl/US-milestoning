@@ -1,0 +1,32 @@
+#!/bin/bash
+
+name=$1
+id=$2
+scratch=$3
+section=1
+#scratch=/scratch/jmsc87/fak/umbrella-explicit/test/
+while true;
+do
+	ok="yes"
+	n=`grep -ci "CPUTime" io/$name-tramd-id-$id-$section.out`
+	if [ "$?" != "0" ]; then
+		break
+	fi
+	if [ "$n" == "0" ]; then
+		break
+	fi
+	for x in `echo "coor vel xsc"`
+	do
+		if [ ! -s "data/$name-tramd-id-$id-$section.$x" ]; then
+			if [ ! -s "$scratch/data/$name-tramd-id-$id-$section.$x" ]; then
+				ok="no"
+				break
+			fi
+		fi
+	done
+	if [ "$ok" == "no" ]; then
+		break
+	fi
+	section=`expr $section + 1`
+done
+echo $section

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+name=$1
+id=$2
+section=1
+files=""
+dir=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber/dcd-nowater
+dir2=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber/dcd-joined
+mkdir -p $dir2
+while true;
+do
+	file=$dir/$name-tramd-id-$id-$section-nowater.dcd
+	if [ ! -s "$file" ]; then
+		break
+	fi
+	files="$files $file"
+	section=`expr $section + 1`
+	#if [ "$section" -gt "5" ]; then
+	#	break
+	#fi
+done
+echo $files
+if [ "$files" != "" ]; then
+	output=$dir2/$name-tramd-id-$id-nowater.dcd
+	~/catdcd/catdcd -o $output -otype dcd $files
+fi

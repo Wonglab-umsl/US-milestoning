@@ -1,0 +1,55 @@
+#!/bin/bash
+
+name=$1
+id=$2
+section=$3
+nprocs=$4
+scratch=$5
+destpath=/scratchE2/spiritij/pyk2/umbrella-amber2/
+
+
+export name
+export id
+export section
+export scratch
+mkdir -p $scratch/dcd
+
+
+
+#charmrun +p${nprocs} namd2 fak-run-umbrella2.inp | tee io/$name-tramd-id-$id-$section.out
+namd2  +p${nprocs} +setcpuaffinity pyk2-run-unbiased3.inp | tee io/$name-tramd-id-$id-$section.out 
+
+
+#remove water molecules from trajectory (after 10 ns) to save disk space
+#if [ "$section" -gt "10" ]; then
+	dcd=$scratch/dcd/$name-tramd-id-$id-$section.dcd
+	psf=../heat-explicit3/prmtop/$name-tramd-window-1-solvated.prmtop
+	ref=data/$name-tramd-window-1-ref.pdb
+	atoms=data/atoms-$name-tramd
+	#awk '(NF==11) && ($2!="WATER") && ($2!="IONS") {print $1-1}' $psf > $atoms
+	awk '/ATOM/ {res=substr($0,18,3); n=substr($0,7,5)-1;  if ((res!="WAT") && (res!="Na+") && (res!="Cl-")) print n}' \
+		$ref > $atoms
+	firstframe=$scratch/frames/$name-tramd-id-$id-$section-firstframe.pdb
+	~/catdcd/catdcd -o $firstframe -otype pdb -s $psf -stype parm7 -first 1 -last 1 $dcd
+	#firstframe2=$scratch/frames/$name-tramd-id-$id-$section-firstframe2.pdb
+	#sed -e "
+	sed -i 's/\x0/ /g' $firstframe
+	shortdcd=$scratch/dcd-nowater/$name-tramd-id-$id-$section-nowater.dcd
+	~/catdcd/catdcd -o $shortdcd -otype dcd -i $atoms $dcd
+	#status=$?
+	#if [ "$status" -eq "0" ]; then
+	#	rm -v $dcd
+	#fi
+	#destdcd=$destpath/dcd/$name-tramd-id-$id-$section-nowater.dcd
+        #~/transfer-it $shortdcd $destdcd
+        #status=$?
+        #echo "transfer of $shortdcd to $destdcd at `date`: exit code $status" >> transfer-log
+        #if [ "$status" -eq "0" ]; then
+                #successful transfer, remove the original file
+                #echo "removing $shortdcd at `date`" >> transfer-log
+                #rm -v $shortdcd
+        #fi
+
+#fi
+
+

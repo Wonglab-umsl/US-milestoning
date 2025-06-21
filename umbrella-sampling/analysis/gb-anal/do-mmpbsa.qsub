@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=pyk2-inte-anal
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --output=temp/slurm-%A_%a.out
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=16
+#SBATCH --mem=16384
+#SBATCH --array=11-187
+
+module load anaconda
+module load mpich/3.3.2/gnu/9.2.0
+export AMBERHOME=/home/jmsc87/.conda/envs/AmberTools21
+name=pyk2-cpd8-amber
+
+
+
+task=$SLURM_ARRAY_TASK_ID
+window=$task
+nproc=$SLURM_NPROCS
+./do-mmpbsa $name $window $nproc
+
+#n=5
+#scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3
+#start=`expr "(" $task - 1 ")" \* $n + 1`
+#end=`expr $start + $n - 1`
+#echo $task $start $end
+#exit
+#for window in `seq $start $end`
+#do
+
+
+
+#done
+

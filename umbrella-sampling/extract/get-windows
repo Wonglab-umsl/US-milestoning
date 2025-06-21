@@ -1,0 +1,20 @@
+#!/bin/bash
+
+
+file=$1
+name=$2
+ref=$3
+#rm $name-tramd-windows-fromref
+n=`wc -l $file | awk '{print $1}'`
+for i in `seq 1 $n`
+do
+	echo "getting window $i"
+	traj=`head -n$i $file | tail -n1 | awk '{print $3}'`
+	iframe=`head -n$i $file | tail -n1 | awk '{print $4}'`
+	vmd -eofexit -dispdev text -e align-frame.tcl -args $ref prmtop/${name}-solvated.prmtop $traj $iframe frames/$name-window-$i.pdb > io/align-frame-$i.out
+	#newcom=`grep -i "Old drug COM" io/align-frame-$i.out | awk '{print $4,$5,$6}'`
+	#echo "$i $newcom" >> $name-tramd-windows-fromref
+	#each frame has to be translated to the origin.
+	#exit
+done
+

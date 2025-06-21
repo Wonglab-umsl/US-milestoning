@@ -1,0 +1,16 @@
+#!/bin/bash
+
+name=$1
+nsim=$2
+oldscratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/umbrella-amber3
+scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/unbiased-amber
+mkdir -p $scratch
+mkdir -p $scratch/data
+mkdir -p $scratch/dcd
+for id in `awk '{print $1}' $name-windows-for-unbiased` #seq 1 $nsim`
+do
+	for x in `echo "coor vel xsc"`
+	do
+		cp -v $oldscratch/heat-data/$name-tramd-window-$id-equil.$x $scratch/data/$name-tramd-id-$id-0.$x
+	done
+done

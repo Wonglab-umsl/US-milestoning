@@ -1,0 +1,102 @@
+#!/bin/bash
+
+name=$1
+milestone=$2
+nprocs=$3
+scratch=$4
+#for foundry, storage and scratch are the same
+#storage=$scratch #/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning
+storage=$5
+
+
+export name
+export scratch
+export storage
+mkdir -p $scratch/dcd
+export cpd=`echo $name | awk -F- '{print $2}'`
+ff=`echo $name | awk -F- '{print $3}'`
+if [ "$name" == "pyk2-cpd1-amber" ]; then
+	pathwayfile=$name-pathway-4
+	milestonefile=$name-milestones-3
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb 
+elif [ "$name" == "pyk2-cpd2-amber" ]; then
+	pathwayfile=$name-pathway-15
+	milestonefile=$name-milestones-2
+	refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd2-charmm" ]; then
+	#same pathway as for amber
+	pathwayfile=$name-pathway-15
+	milestonefile=$name-milestones-1
+	#use same reference as for amber trajectory
+	refpdb=../ref/pyk2-$cpd-charmm-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd8-amber" ]; then
+	pathwayfile=$name-pathway-2-inserted
+	milestonefile=$name-milestones-4
+	refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd6-amber" ]; then
+	pathwayfile=$name-pathway-72
+	milestonefile=$name-milestones-1
+	refpdb=~/pyk2/umbrella-amber/ref/$name-window-1-ref.pdb
+elif [ "$name" == "pyk2-cpd10-amber" ]; then
+	pathwayfile=$name-pathway-23-energy2
+	milestonefile=$name-milestones-2-energy2
+	refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+else
+	echo "unrecognized system name"
+	exit
+fi
+
+line=`awk -v i=$milestone '($1==i) {print $0}' $milestonefile`
+nanchor=`wc -l $pathwayfile | awk '{print $1}'`      
+ianchor=`echo $line | awk '{print $2}'`
+janchor=`echo $line | awk '{print $3}'`
+
+#exit
+output=io/$name-milestone-$ianchor-$janchor.out
+n=0
+if [ -s $output ]; then
+	n=`grep -ci "CPUTime" $output`
+fi
+echo $n
+if [ "$n" -gt "0" ]; then
+	echo "already done, exiting"
+	exit
+fi
+
+#echo $ianchor $janchor
+#exit
+kharm=1500
+kharm_wall=1000
+colvarfile=io/colvar-$name-milestone-$ianchor-$janchor.inp
+#echo $nanchor $milestone
+#this generates the colvar file
+./generate_colvar_file.py $nanchor $pathwayfile $milestonefile $milestone $refpdb $kharm ${kharm_wall} $colvarfile
+export ianchor
+export janchor
+
+#exit
+output=io/$name-milestone-$ianchor-$janchor.out
+#script depends on force field
+if [ "$ff" == "amber" ]; then
+	script=pyk2-equil-milestoning.inp
+elif [ "$ff" == "charmm" ]; then
+	script=pyk2-equil-milestoning-charmm.inp
+else
+	echo "unrecognized force field"
+	exit
+fi
+namd3  +p${nprocs} +setcpuaffinity $script | tee $output
+n=`grep -ci "fatal error" $output`
+if [ "$n" -gt "0" ]; then
+	return -1
+fi
+
+
+#clean up the colvars file, also to save space in the home directory
+                
+cvfile=data/$name-window-$window-${section}.colvars.traj
+cvfile2=data/$name-window-$window-${section}.colvars.temp
+awk '((NR==1) || ((substr($0,1,1)!="#") && ($1%500==0))) {print $0}' $cvfile > ${cvfile2}
+mv -v ${cvfile2} $cvfile        
+
+

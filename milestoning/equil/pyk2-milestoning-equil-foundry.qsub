@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --partition=general
+#SBATCH --job-name=pyk2-milestoning-heat-lewis
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=64
+#SBATCH --array=61-94
+#SBATCH --mem=4096
+
+
+
+module purge 
+module load namd
+module load anaconda
+nprocs=$SLURM_NTASKS
+
+
+# this has to be changed - notice the number of CPUs +p12
+#namd2  +p12 fak-time-test.inp | tee io/fak-cpd32-cgenff-time-test-lewis-3gpu-${nprocs}.out 
+
+#line=`head -n$SLURM_ARRAY_TASK_ID list | tail -n1`
+#export name=`echo $line | awk '{print $2}'`
+#export force=`echo $line | awk '{print $3}'`
+#export window=`echo $line | awk '{print $3}'`
+export name=pyk2-cpd10-amber
+export milestone=$SLURM_ARRAY_TASK_ID
+export scratch=/lustre/scratch/jmsc87/pyk2/milestoning
+export storage=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning
+#export id=1
+
+./do-equil-milestoning $name $milestone $nprocs $scratch $storage

@@ -1,0 +1,78 @@
+#!/bin/bash
+#!/bin/bash
+#SBATCH --partition=requeue
+#SBATCH --job-name=pyk2-milestoning-heat-lewis
+#SBATCH --time=0-12:00:00
+##SBATCH --mail-type=begin,end,fail,requeue
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=64
+#SBATCH --array=61-94
+#SBATCH --mem=4096
+
+
+cat /proc/cpuinfo > cpuinfo
+module purge 
+#unset MODULEPATH
+#source /cluster/spack-2020/opt/spack/linux-centos7-x86_64/gcc-6.3.0/lmod-8.1.5-w5bf3f6lvfzxk6vmeaagqkjof47zl3yn/lmod/lmod/init/bash
+#module use /cluster/spack-2020/share/spack/lmod/linux-centos7-x86_64/Core
+
+module load namd
+module load anaconda
+
+nprocs=$SLURM_NTASKS
+milestone=$SLURM_ARRAY_TASK_ID
+export name=pyk2-cpd10-amber
+milestonefile=$name-milestones-2-energy2
+line=`awk -v i=$milestone '($1==i) {print $0}' $milestonefile`
+export ianchor=`echo $line | awk '{print $2}'`
+export janchor=`echo $line | awk '{print $3}'`
+
+
+export boxl=`awk -v i=$ianchor -v j=$janchor '($1==i) && ($2==j) {print $3}' $name-box-lengths`
+#export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning-amber3
+export scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning/
+#export PATH=/home/plmx7/data/TICKETS_LAZIC/NAMD_JUSTIN/TRY_NAMD_WITH_OPENMPI_SYSTEM_unified_1_2020/:$PATH
+#export PATH=${HOME}/NAMD_2.13_Source/Linux-x86_64-g++_CUDA:$PATH
+# this has to be changed - notice the number of CPUs +p12
+#namd3  +p12 pyk2-time-test.inp | tee io/pyk2-cpd32-cgenff-time-test-lewis-3gpu-${nprocs}.out 
+
+#colvarfile=io/colvar-$name-milestone-$ianchor-$janchor.inp
+#nanchor=101
+#pathwayfile=$name-pathway-3
+#refpdb=~/pyk2/umbrella-amber/ref/$name-tramd-window-1-ref.pdb
+#kharm=1500
+#./generate_colvar_file.py $nanchor $pathwayfile $milestonefile $milestone $refpdb $kharm $colvarfile
+
+
+output=io/$name-milestone-$ianchor-$janchor-min.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd3 +p${nprocs} +setcpuaffinity pyk2-milestoning-minimize-amber.inp | tee $output
+fi
+mv -v data/$name-milestone-$ianchor-$janchor-min.pdb.coor  data/$name-milestone-$ianchor-$janchor-min.pdb
+#exit
+
+output=io/$name-milestone-$ianchor-$janchor-heat.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd3 +p${nprocs} +setcpuaffinity pyk2-milestoning-heat-amber.inp | tee $output
+	./strip-water-heat $name $milestone $milestone
+fi
+
+
+exit
+output=io/$name-milestone-$ianchor-$janchor-equil.out
+n=0
+if [ -s "$output" ]; then
+        n=`grep -ci "cputime" $output`
+fi
+if [ "$n" -eq "0" ]; then
+	namd3  +p${nprocs} +setcpuaffinity pyk2-milestoning-equil-amber.inp | tee $output
+fi

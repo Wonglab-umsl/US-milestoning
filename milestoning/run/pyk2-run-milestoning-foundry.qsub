@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --partition=general
+#SBATCH --job-name=pyk2-milestoning-run-foundry
+#SBATCH --output=job-output/slurm-%A-:ianchor;-:janchor;_%a.out
+#SBATCH --time=0-12:00:00
+#SBATCH --export=all
+#SBATCH --nodes=1
+#SBATCH --ntasks=8
+#SBATCH --array=:array;
+#SBATCH --mem=4096
+
+module purge
+module load namd
+module load anaconda
+nprocs=$SLURM_NTASKS
+
+name=pyk2-cpd10-amber
+#each milestone will correspond to a separate job.  we can't encode like we do on lewis.
+id=$SLURM_ARRAY_TASK_ID
+milestone=:milestone;
+echo "this is name $name milestone $milestone id $id"
+
+scratch=/mnt/stor/ceph/scratch/jmsc87/pyk2/milestoning/
+#storage=/storage/hpc/group/wong/scratch/Justin/pyk2/milestoning/
+start=1
+end=100
+
+./do-milestoning-sections $name $milestone $id $start $end $nprocs $scratch #$storage

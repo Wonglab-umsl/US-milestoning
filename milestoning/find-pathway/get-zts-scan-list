@@ -1,0 +1,16 @@
+#!/bin/bash
+
+file=zts-scan-list
+rm $file
+counter=1
+for theta in `seq 15 15 165`
+do
+	for phi in `seq 90 15 270`
+	do
+		x=`echo $theta $phi | awk '{printf("%.3f\n",sin($1*.01745)*cos($2*.01745))}'`
+		y=`echo $theta $phi | awk '{printf("%.3f\n",sin($1*.01745)*sin($2*.01745))}'`
+		z=`echo $theta $phi | awk '{printf("%.3f\n",cos($1*.01745))}'`
+		echo "$counter $theta $phi $x $y $z" >> $file
+		counter=`expr $counter + 1`
+	done
+done
