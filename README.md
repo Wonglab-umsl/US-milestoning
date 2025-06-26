@@ -22,13 +22,6 @@ dissociation; this can be from a steered molecular dynamics simulation,
 a *τ*-RAMD simulation, a simulation from the “pathways” method described
 below, or some other technique.
 
-This attempts to document how I performed the umbrella sampling
-simulations for PYK2 and the Markov state analysis using TRAM. I have
-tried to collect together all the scripts I used in the `` directory.
-Most of the scripts identify the simulation by a `name` parameter. The
-name I use is a combination of the name of the protein, the ligand, and
-the force field used, for example `pyk2-cpd1-amber`.
-
 Needed software includes `tleap` from AmberTools, VMD and NAMD. If
 compounds need to be parameterized, it will be necessary to use
 Schrodinger Maestro, Gaussian, and `antechamber` from AmberTools as
