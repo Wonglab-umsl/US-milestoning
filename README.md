@@ -467,8 +467,7 @@ solvated structures that were used for the initial pathway simulations
 
 # TRAM scripts
 
-These are in the `tram/` directory. (Should I include these or leave
-them for another time?)
+These are in the `tram/` directory. 
 
 1.  `tica-lag-time-validation-unbiased.py` – performs TICA analysis.  
 
